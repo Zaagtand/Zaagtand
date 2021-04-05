@@ -164,11 +164,6 @@ namespace FinGen.WebApplication.SysteemTest.ING.Scripts.RegressieSet.OutputManag
             Console.WriteLine("Ovk Nr: {0}", _ovkNummer);
 
             new AcceptatiekaderAction(ATF).Run();
-
-            if(bkrContract.Box1.HasValue && bkrContract.Box1.Value)
-            {
-                SetRadioButton("Box", "Box 1");
-            }
         }
     }
 }
