@@ -45,18 +45,16 @@ namespace FinGen.WebApplication.SysteemTest.ING.Scripts.RegressieSet.OutputManag
                 offerte["NewMortgageApplication"]["Application"]["DossierReference"].Value<string>().Should().Be(_ovkNummer);
                 offerte["NewMortgageApplication"]["RealEstateCollection"][0]["Item"]["PlotInformation"]["ConstructionPlan"].Value<string>().Should().Be("1234567");
                 offerte["NewMortgageApplication"]["RealEstateCollection"][0]["Item"]["PlotInformation"]["Plot"].Value<string>().Should().Be("333333");
-                offerte["NewMortgageApplication"]["DeedPassingInformation"]["NotaryOffice"]["NotaryOfficePhoneNumber"].Value<string>().Should().Be("+31 76 503 45 57 ");
-                offerte["NewMortgageApplication"]["DeedPassingInformation"]["NotaryOffice"]["NotaryOfficePostalAddress"]["HouseNumber"].Value<string>().Should().Be("25");
-                offerte["NewMortgageApplication"]["DeedPassingInformation"]["NotaryOffice"]["NotaryOfficePostalAddress"]["PostalCode"].Value<string>().Should().Be("7411HW");
-                offerte["NewMortgageApplication"]["LoanCollection"][1]["RepaymentMethodDetails"]["TermAmountMaximumInterestLast20Years"].Value<decimal>().Should().Be(965.4000m);
-                offerte["NewMortgageApplication"]["BKRRegistrationCollection"][0]["TaxIndication"].Value<int>().Should().Be(0);
-                offerte["NewMortgageApplication"]["ApplicantCollection"][0]["DutchFiscalResidency"].Value<bool>().Should().BeTrue();
-                offerte["NewMortgageApplication"]["ApplicantCollection"][0]["ForeignFiscalResidency"].Value<bool>().Should().BeFalse();
+                
             };
         }
 
         private void LoginEnVoerAanvraagOpTotAanmakenOfferte()
         {
+            var loginPagina = ATF.GetPage<LoginPage>();
+            loginPagina.NavigateToMe();
+            loginPagina.LogIn();
+
             var loginPagina = ATF.GetPage<LoginPage>();
             loginPagina.NavigateToMe();
             loginPagina.LogIn();
