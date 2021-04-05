@@ -1,0 +1,169 @@
+using System;
+using System.Collections.Generic;
+using FinGen.WebApplication.SysteemTest.Base;
+using FinGen.WebApplication.SysteemTest.ING.BerichtHelper;
+using FinGen.WebApplication.SysteemTest.ING.Helper;
+using FinGen.WebApplication.SysteemTest.BerichtHelper;
+using FinGen.WebApplication.SysteemTest.ING.Actions;
+using FinGen.WebApplication.SysteemTest.ING.Input;
+using FinGen.WebApplication.SysteemTest.ING.Input.Enums;
+using FinGen.WebApplication.SysteemTest.ING.Pages;
+using FinGen.WebApplication.SysteemTest.Input;
+using FinGen.WebApplication.SysteemTest.Pages;
+using FluentAssertions;
+using FluentAssertions.Execution;
+using Newtonsoft.Json.Linq;
+using NUnit.Framework;
+using FinancieringPage = FinGen.WebApplication.SysteemTest.ING.Pages.FinancieringPage;
+using InkomenPage = FinGen.WebApplication.SysteemTest.ING.Pages.InkomenPage;
+using StartschermPage = FinGen.WebApplication.SysteemTest.ING.Pages.StartschermPage;
+using FinGen.WebApplication.SysteemTest.Input.Enums;
+using AkteEnAfrekeningPage = FinGen.WebApplication.SysteemTest.ING.Pages.AkteEnAfrekeningPage;
+
+namespace FinGen.WebApplication.SysteemTest.ING.Scripts.RegressieSet.OutputManagement
+{
+    [TestFixture]
+    class ControleOMSOfferteOutputNieuwBouw : BasicTest
+    {
+        private string _ovkNummer;
+        private IngEventDebuggerPage _eventdebuggerPage;
+
+        public override void OneTimeSetUp()
+        {
+            LoginEnVoerAanvraagOpTotAanmakenOfferte();
+            _eventdebuggerPage = ATF.GetPage<IngEventDebuggerPage>();
+            _eventdebuggerPage.EventUitvoeren(Input.Enums.Events.VerstuurBindendAanbod);
+        }
+
+        [Test]
+        public void OMSOfferteControle()
+        {
+            var offerte = OMSBerichtHelper.GetOMSOutputBericht(_ovkNummer, false);
+
+            using (new AssertionScope())
+            {
+                offerte["NewMortgageApplication"]["Application"]["DossierReference"].Value<string>().Should().Be(_ovkNummer);
+                offerte["NewMortgageApplication"]["RealEstateCollection"][0]["Item"]["PlotInformation"]["ConstructionPlan"].Value<string>().Should().Be("1234567");
+                offerte["NewMortgageApplication"]["RealEstateCollection"][0]["Item"]["PlotInformation"]["Plot"].Value<string>().Should().Be("333333");
+                offerte["NewMortgageApplication"]["DeedPassingInformation"]["NotaryOffice"]["NotaryOfficePhoneNumber"].Value<string>().Should().Be("+31 76 503 45 57 ");
+                offerte["NewMortgageApplication"]["DeedPassingInformation"]["NotaryOffice"]["NotaryOfficePostalAddress"]["HouseNumber"].Value<string>().Should().Be("25");
+                offerte["NewMortgageApplication"]["DeedPassingInformation"]["NotaryOffice"]["NotaryOfficePostalAddress"]["PostalCode"].Value<string>().Should().Be("7411HW");
+                offerte["NewMortgageApplication"]["LoanCollection"][1]["RepaymentMethodDetails"]["TermAmountMaximumInterestLast20Years"].Value<decimal>().Should().Be(965.4000m);
+                offerte["NewMortgageApplication"]["BKRRegistrationCollection"][0]["TaxIndication"].Value<int>().Should().Be(0);
+                offerte["NewMortgageApplication"]["ApplicantCollection"][0]["DutchFiscalResidency"].Value<bool>().Should().BeTrue();
+                offerte["NewMortgageApplication"]["ApplicantCollection"][0]["ForeignFiscalResidency"].Value<bool>().Should().BeFalse();
+            };
+        }
+
+        private void LoginEnVoerAanvraagOpTotAanmakenOfferte()
+        {
+            var loginPagina = ATF.GetPage<LoginPage>();
+            loginPagina.NavigateToMe();
+            loginPagina.LogIn();
+
+            var bericht = HDNImportHelper.LeesHdnBerichtInEnOpenAanvraag(ATF, IngHdnBerichtType.CompleetTotOfferte);
+            var contractant = bericht.ContractantAchternaam;
+
+            //Dienstverbandgegevens toevoegen
+            var inkomenPage = ATF.GetPage<InkomenPage>();
+            inkomenPage.NavigateToMe();
+            var inkomen = new INGDienstverbandGegevens(true);
+            inkomenPage.DienstverbandAanvullen("loondienst", inkomen);
+
+            var ingStatusOvergangDialoog = ATF.GetPage<StatusOvergangDialog>();
+            ingStatusOvergangDialoog.ExecuteWorkflowStatusChange(new StatusChangeInput(WorkflowStatus.Acceptatie_WijzigenAanvraag, WorkflowStatus.Acceptatie_WijzigenAanvraag));
+
+            //Wijzig aanvraag naar NHG
+            var startPage = ATF.GetPage<StartschermPage>();
+            startPage.PasAanvraagAanNaarNHGGarantie(false);
+
+            //Onderpandgegevens aanvullen
+            var onderpandPage = ATF.GetPage<OnderpandPage>();
+            onderpandPage.NavigateToMe();
+
+            var onderpand = new INGOnderpandgegevens()
+            {
+                ContractantEigenarenOnderpand = new List<string> { contractant },
+                SoortBouw = BouwSoort.Nieuwbouw,
+                Marktwaarde = null,
+                AanneemSom = 285000,
+                MeerwerkRegulier = 0,
+                MeerwerkVergrotend = 0,
+                Bouwplan = "1234567",
+                BouwplanNummer = 333333,
+                GrondReedsInBezit = true,
+                RenteverliesBouw = 0
+            };
+
+            onderpandPage.BewerkenOnderpand("Aan te kopen", onderpand);
+
+            //notaris invullen            
+            var akteEnAfrekeningPagina = ATF.GetPage<AkteEnAfrekeningPage>();
+            akteEnAfrekeningPagina.NavigateToMe();
+            var notaris = new INGNotarisSearchCriteria(true);
+            var notarisDialoog = ATF.GetPage<PartijZoekenDialog>();
+            notarisDialoog.PartijSelecterenEnOpslaan(notaris);
+
+            //Afhandelingskosten opvoeren
+            var financieringPagina = ATF.GetPage<FinancieringPage>();
+            financieringPagina.NavigateToMe();
+            var hypotheekkosten = new Hypotheekkosten
+            {
+                AdvieskostenvanToepassing = "Ja",
+                Betalingsmethode = "Meegefinancierd",
+            };
+            financieringPagina.InvullenHypotheekkosten("Standaard", hypotheekkosten);
+
+            //Financieringscherm vullen
+            financieringPagina.NavigateToMe();
+
+            var leningdeelLineair = new INGLeningdeelGegevens
+            {
+                Deelsom = 180000,
+                Aflossingsvorm = Input.Enums.Aflossingsvorm.AflossingsvrijeHypotheek,
+                LooptijdInMaanden = 360,
+                Renteproduct = "1 maand variabel",
+            };
+
+            var hypotheek = new INGHypotheekGegevens
+            {
+                Rangorde = 1,
+                Productlijn = "Standaard",
+                Leningdelen = new List<INGLeningdeelGegevens> { leningdeelLineair }
+            };
+
+            var productGegevens = new INGProductGegevens
+            {
+                Hypotheken = new List<INGHypotheekGegevens> { hypotheek }
+            };
+
+            financieringPagina.ToevoegenProducten(productGegevens);
+
+
+
+            var bkrPagina = ATF.GetPage<ToetsingBkrPage>();
+            bkrPagina.NavigateToMe();
+
+            var bkrKredietAk = new BkrContractGegevens
+            {
+                Bedrag = 500,
+                Kredietsoort = KredietSoort.AflopendKrediet,
+                EersteAflossing = DateTime.Now.AddMonths(1),
+                Aflossen = false,
+                Status = StatusBkr.Lopend,
+                StatusMotivatie = "Test",
+                MotivatieHandmatig = "Test",
+                Box1 = true
+            };
+
+            bkrPagina.ToevoegenBkrContracten(new List<BkrContractGegevens> { bkrKredietAk });
+
+            ingStatusOvergangDialoog.ExecuteWorkflowStatusChange(new StatusChangeInput(WorkflowStatus.Acceptatie_AanvraagGewijzigd, WorkflowStatus.Acceptatie_WachtOpStukkenKredietwaardigheid));
+
+            _ovkNummer = inkomenPage.OphalenOvereenkomstnummer();
+            Console.WriteLine("Ovk Nr: {0}", _ovkNummer);
+
+            new AcceptatiekaderAction(ATF).Run();
+        }
+    }
+}

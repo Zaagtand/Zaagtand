@@ -1,0 +1,4 @@
+            if(bkrContract.Box1.HasValue && bkrContract.Box1.Value)
+            {
+                SetRadioButton("Box", "Box 1");
+            }

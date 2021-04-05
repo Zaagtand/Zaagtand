@@ -1,0 +1,5 @@
+    <TestCommand>
+      <TestType>Selenium</TestType>
+      <ATFProject>FinGen.WebApplication.SysteemTest.ING</ATFProject>
+      <TestFixture>FinGen.WebApplication.SysteemTest.ING.Scripts.RegressieSet.OutputManagement.ControleOMSOfferteOutputNieuwBouw</TestFixture>
+    </TestCommand>
